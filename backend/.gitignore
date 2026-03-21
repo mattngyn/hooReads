@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# uv
+uv.lock
+
+# SQLite database
+data/
+
+# Generated assets
+static/scenes/
+static/audio/
+
+# Finetuning artifacts (large files)
+finetune/dataset/panoramas/
+finetune/dataset/captions/
+finetune/train/dataset/
+finetune/train/logs/
+finetune/weights/
+finetune/eval/generated_images/
+finetune/eval/results/
+
+# WorldGen (cloned dependency -- clone fresh on setup, don't commit)
+WorldGen/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
