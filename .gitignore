@@ -1,0 +1,21 @@
+# Secrets
+.env
+.env.*
+*.key
+*.pem
+
+# Uploaded books / local project data
+story_projects/
+local_uploads/
+uploads/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
