@@ -90,6 +90,11 @@ class GenerationDetail(BaseModel):
     updated_at: str
 
 
+class SceneListResponse(BaseModel):
+    generation_id: str
+    scenes: list[MomentDetail]
+
+
 class GenerationListResponse(BaseModel):
     generations: list[GenerationSummary]
 

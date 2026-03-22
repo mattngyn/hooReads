@@ -5,7 +5,7 @@ All progress is persisted to SQLite so the frontend can poll.
 """
 
 import asyncio
-import uuid
+import logging
 from pathlib import Path
 
 from app.config import get_settings
@@ -20,29 +20,41 @@ from app.services.generation_store import (
 )
 from app.world_model import create_adapter
 
+logger = logging.getLogger(__name__)
+
 
 async def _generate_scene_for_moment(gen_id: str, moment_index: int, scene_description: str) -> None:
     """Kick off scene generation and poll until complete."""
-    adapter = create_adapter()
-
-    await update_moment_scene(gen_id, moment_index, "processing")
-
     try:
+        logger.info(f"[{gen_id}] Scene {moment_index}: creating adapter")
+        adapter = create_adapter()
+
+        await update_moment_scene(gen_id, moment_index, "processing")
+
+        logger.info(f"[{gen_id}] Scene {moment_index}: starting generation")
         job = await adapter.generate_scene(scene_description)
+        logger.info(f"[{gen_id}] Scene {moment_index}: job_id={job.job_id}, polling...")
 
         while True:
-            await asyncio.sleep(2)
+            await asyncio.sleep(5)
             status = await adapter.get_scene_status(job.job_id)
+            logger.info(f"[{gen_id}] Scene {moment_index}: status={status.status}, progress={status.progress}")
 
             if status.status == "complete":
                 asset = await adapter.get_scene_asset(job.job_id)
                 await update_moment_scene(gen_id, moment_index, "complete", asset.url, asset.format)
+                logger.info(f"[{gen_id}] Scene {moment_index}: complete -> {asset.url}")
                 return
             elif status.status == "failed":
                 await update_moment_scene(gen_id, moment_index, "failed")
+                logger.error(f"[{gen_id}] Scene {moment_index}: generation failed")
                 return
     except Exception:
-        await update_moment_scene(gen_id, moment_index, "failed")
+        logger.exception(f"[{gen_id}] Scene {moment_index}: exception")
+        try:
+            await update_moment_scene(gen_id, moment_index, "failed")
+        except Exception:
+            pass
 
 
 async def _generate_audio_for_moment(gen_id: str, moment_index: int, narration_text: str, emotional_tone: str) -> None:
@@ -50,6 +62,7 @@ async def _generate_audio_for_moment(gen_id: str, moment_index: int, narration_t
     await update_moment_audio(gen_id, moment_index, "processing")
 
     try:
+        logger.info(f"[{gen_id}] Audio {moment_index}: generating TTS ({len(narration_text)} chars)")
         audio_bytes = await generate_narration(narration_text, emotional_tone)
 
         settings = get_settings()
@@ -60,32 +73,38 @@ async def _generate_audio_for_moment(gen_id: str, moment_index: int, narration_t
         audio_path.write_bytes(audio_bytes)
 
         await update_moment_audio(gen_id, moment_index, "complete", f"/static/audio/{filename}")
-    except Exception:
+        logger.info(f"[{gen_id}] Audio {moment_index}: complete ({len(audio_bytes)} bytes)")
+    except Exception as e:
+        logger.exception(f"[{gen_id}] Audio {moment_index}: exception during TTS")
         await update_moment_audio(gen_id, moment_index, "failed")
 
 
 async def run_pipeline(gen_id: str, source_text: str, num_scenes: int = 5) -> None:
     """Full pipeline: extract moments, then generate scenes + audio in parallel per moment."""
     try:
+        logger.info(f"[{gen_id}] Pipeline started (num_scenes={num_scenes})")
         await update_generation_status(gen_id, "extracting")
 
         moments = await extract_key_moments(source_text, num_scenes)
         if not moments:
+            logger.error(f"[{gen_id}] No moments extracted")
             await update_generation_status(gen_id, "failed")
             return
 
         title = moments[0].title if moments else "Untitled"
+        logger.info(f"[{gen_id}] Extracted {len(moments)} moments, title={title!r}")
         await update_generation_status(gen_id, "processing", title=title)
         await insert_moments(gen_id, moments)
 
-        # For each moment, run scene generation and audio generation concurrently
         tasks = []
         for m in moments:
             tasks.append(_generate_scene_for_moment(gen_id, m.id, m.scene_description))
             tasks.append(_generate_audio_for_moment(gen_id, m.id, m.narration_text, m.emotional_tone))
 
         await asyncio.gather(*tasks, return_exceptions=True)
-        await recompute_generation_status(gen_id)
+        final_status = await recompute_generation_status(gen_id)
+        logger.info(f"[{gen_id}] Pipeline finished: {final_status}")
 
-    except Exception:
+    except Exception as e:
+        logger.exception(f"[{gen_id}] Pipeline failed")
         await update_generation_status(gen_id, "failed")

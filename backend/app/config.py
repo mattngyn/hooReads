@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     # Static files directory for generated scenes
     static_dir: str = "static"
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
 
 @lru_cache

@@ -31,7 +31,7 @@ async def extract_key_moments(text: str, num_scenes: int = 5) -> list[KeyMoment]
     system_prompt = SYSTEM_PROMPT_TEMPLATE.format(num_scenes=num_scenes)
 
     response = await client.chat.completions.create(
-        model="gpt-4o",
+        model="gpt-5-nano",
         response_format={"type": "json_object"},
         messages=[
             {"role": "system", "content": system_prompt},

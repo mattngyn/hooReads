@@ -163,6 +163,60 @@ async def get_generation(gen_id: str) -> GenerationDetail | None:
         await db.close()
 
 
+async def list_moments(gen_id: str) -> list[MomentDetail]:
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "SELECT * FROM moments WHERE generation_id = ? ORDER BY moment_index", (gen_id,)
+        )
+        rows = await cursor.fetchall()
+        return [
+            MomentDetail(
+                moment_index=r["moment_index"],
+                title=r["title"],
+                scene_description=r["scene_description"],
+                narration_text=r["narration_text"],
+                emotional_tone=r["emotional_tone"],
+                page_reference=r["page_reference"],
+                scene_status=r["scene_status"],
+                scene_asset_url=r["scene_asset_url"],
+                scene_asset_format=r["scene_asset_format"],
+                audio_status=r["audio_status"],
+                audio_url=r["audio_url"],
+            )
+            for r in rows
+        ]
+    finally:
+        await db.close()
+
+
+async def get_moment(gen_id: str, moment_index: int) -> MomentDetail | None:
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "SELECT * FROM moments WHERE generation_id = ? AND moment_index = ?",
+            (gen_id, moment_index),
+        )
+        r = await cursor.fetchone()
+        if r is None:
+            return None
+        return MomentDetail(
+            moment_index=r["moment_index"],
+            title=r["title"],
+            scene_description=r["scene_description"],
+            narration_text=r["narration_text"],
+            emotional_tone=r["emotional_tone"],
+            page_reference=r["page_reference"],
+            scene_status=r["scene_status"],
+            scene_asset_url=r["scene_asset_url"],
+            scene_asset_format=r["scene_asset_format"],
+            audio_status=r["audio_status"],
+            audio_url=r["audio_url"],
+        )
+    finally:
+        await db.close()
+
+
 async def recompute_generation_status(gen_id: str) -> str:
     """Derive the generation's overall status from its moments. Returns the new status."""
     db = await get_db()

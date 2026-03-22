@@ -1,16 +1,23 @@
 import asyncio
+from pathlib import Path
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 
+from app.config import get_settings
 from app.models.schemas import (
     GenerationCreateResponse,
     GenerationDetail,
     GenerationListResponse,
+    MomentDetail,
+    SceneListResponse,
 )
 from app.services.generation_store import (
     create_generation,
     get_generation,
+    get_moment,
     list_generations,
+    list_moments,
 )
 from app.services.pdf import extract_text_from_pdf
 from app.services.pipeline import run_pipeline
@@ -78,3 +85,63 @@ async def get_generation_by_id(gen_id: str):
     if gen is None:
         raise HTTPException(status_code=404, detail="Generation not found")
     return gen
+
+
+@router.get("/generations/{gen_id}/scenes", response_model=SceneListResponse)
+async def get_scenes(gen_id: str):
+    """List all scenes/moments for a generation, ordered by moment_index."""
+    gen = await get_generation(gen_id)
+    if gen is None:
+        raise HTTPException(status_code=404, detail="Generation not found")
+
+    moments = await list_moments(gen_id)
+    return SceneListResponse(generation_id=gen_id, scenes=moments)
+
+
+@router.get("/generations/{gen_id}/scenes/{moment_index}", response_model=MomentDetail)
+async def get_scene(gen_id: str, moment_index: int):
+    """Get details of a specific scene by its index."""
+    moment = await get_moment(gen_id, moment_index)
+    if moment is None:
+        raise HTTPException(status_code=404, detail="Scene not found")
+    return moment
+
+
+@router.get("/generations/{gen_id}/scenes/{moment_index}/splat")
+async def get_scene_splat(gen_id: str, moment_index: int):
+    """Download the gaussian splat file for a scene."""
+    moment = await get_moment(gen_id, moment_index)
+    if moment is None:
+        raise HTTPException(status_code=404, detail="Scene not found")
+    if moment.scene_status != "complete" or not moment.scene_asset_url:
+        raise HTTPException(status_code=404, detail=f"Scene splat not available (status: {moment.scene_status})")
+
+    settings = get_settings()
+    file_path = Path(settings.static_dir) / moment.scene_asset_url.removeprefix("/static/")
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Splat file not found on disk")
+
+    media_type = "application/octet-stream"
+    if moment.scene_asset_format == "ply":
+        media_type = "application/x-ply"
+    elif moment.scene_asset_format == "spz":
+        media_type = "application/octet-stream"
+
+    return FileResponse(file_path, media_type=media_type, filename=file_path.name)
+
+
+@router.get("/generations/{gen_id}/scenes/{moment_index}/audio")
+async def get_scene_audio(gen_id: str, moment_index: int):
+    """Download the narration audio file for a scene."""
+    moment = await get_moment(gen_id, moment_index)
+    if moment is None:
+        raise HTTPException(status_code=404, detail="Scene not found")
+    if moment.audio_status != "complete" or not moment.audio_url:
+        raise HTTPException(status_code=404, detail=f"Audio not available (status: {moment.audio_status})")
+
+    settings = get_settings()
+    file_path = Path(settings.static_dir) / moment.audio_url.removeprefix("/static/")
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Audio file not found on disk")
+
+    return FileResponse(file_path, media_type="audio/wav", filename=file_path.name)
