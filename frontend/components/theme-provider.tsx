@@ -55,6 +55,11 @@ function ThemeHotkey() {
         return
       }
 
+      // Ignore theme hotkeys while an immersive viewer has pointer lock.
+      if (document.pointerLockElement) {
+        return
+      }
+
       setTheme(resolvedTheme === "dark" ? "light" : "dark")
     }
 

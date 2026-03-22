@@ -1,4 +1,10 @@
 declare module "@mkkellogg/gaussian-splats-3d" {
+  export const WebXRMode: {
+    None: number
+    VR: number
+    AR: number
+  }
+
   export const SceneFormat: {
     Ply: number
     Splat: number
@@ -13,6 +19,8 @@ declare module "@mkkellogg/gaussian-splats-3d" {
     ): Promise<void>
     start(): void
     stop(): void
+    render(): void
+    update(renderer?: unknown, camera?: unknown): void
     dispose(): Promise<void>
   }
 }
