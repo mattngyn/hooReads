@@ -2,7 +2,16 @@
 
 import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
-import { AlertCircle, Box, Download, ExternalLink, LoaderCircle, Move3D, MousePointer2, Orbit } from "lucide-react"
+import {
+  AlertCircle,
+  Box,
+  Download,
+  ExternalLink,
+  LoaderCircle,
+  MousePointer2,
+  Move3D,
+  Orbit,
+} from "lucide-react"
 
 type SceneViewerProps = {
   assetUrl: string | null
@@ -11,18 +20,6 @@ type SceneViewerProps = {
 }
 
 type ViewerState = "idle" | "loading" | "ready" | "error"
-
-type GaussianViewer = {
-  addSplatScene: (
-    path: string,
-    options?: Record<string, unknown>
-  ) => Promise<void>
-  update: (renderer?: unknown, camera?: unknown) => void
-  render: () => void
-  start: () => void
-  stop: () => void
-  dispose: () => Promise<void>
-}
 
 export function SceneViewer({
   assetUrl,
@@ -43,7 +40,10 @@ export function SceneViewer({
     const sceneAssetUrl = assetUrl
     let renderer: import("three").WebGLRenderer | null = null
     let camera: import("three").PerspectiveCamera | null = null
-    let viewer: GaussianViewer | null = null
+    let scene: import("three").Scene | null = null
+    let splatMesh: import("@sparkjsdev/spark").SplatMesh | null = null
+    let sparkRenderer: import("@sparkjsdev/spark").SparkRenderer | null = null
+    let xrButton: HTMLElement | null = null
     let resizeObserver: ResizeObserver | null = null
     const pressedKeys = new Set<string>()
     let yaw = 0
@@ -63,9 +63,9 @@ export function SceneViewer({
         return
       }
 
-      const [{ Viewer, SceneFormat, WebXRMode }, THREE] = await Promise.all([
-        import("@mkkellogg/gaussian-splats-3d"),
+      const [THREE, Spark] = await Promise.all([
         import("three"),
+        import("@sparkjsdev/spark"),
       ])
 
       const webglRenderer = new THREE.WebGLRenderer({
@@ -73,17 +73,40 @@ export function SceneViewer({
         alpha: true,
       })
       renderer = webglRenderer
-
       webglRenderer.setClearAlpha(0)
+      webglRenderer.xr.enabled = true
       container.appendChild(webglRenderer.domElement)
 
-      const aspect = Math.max(container.clientWidth, 1) / Math.max(container.clientHeight, 1)
-      const perspectiveCamera = new THREE.PerspectiveCamera(65, aspect, 0.1, 1000)
+      const perspectiveCamera = new THREE.PerspectiveCamera(
+        65,
+        Math.max(container.clientWidth, 1) / Math.max(container.clientHeight, 1),
+        0.1,
+        1000
+      )
       perspectiveCamera.position.set(3, 2, 8)
       perspectiveCamera.rotation.order = "YXZ"
       perspectiveCamera.up.set(0, -1, 0)
       perspectiveCamera.lookAt(0, 0, 0)
       camera = perspectiveCamera
+
+      const threeScene = new THREE.Scene()
+      scene = threeScene
+
+      sparkRenderer = new Spark.SparkRenderer({
+        renderer: webglRenderer,
+        preUpdate: false,
+      })
+      threeScene.add(sparkRenderer)
+
+      splatMesh = new Spark.SplatMesh({
+        url: sceneAssetUrl,
+        fileType: Spark.SplatFileType.SPZ,
+      })
+      await splatMesh.initialized
+
+      // Keep SPZ orientation aligned with the current scene setup.
+      splatMesh.quaternion.set(0, 0, 0, 1)
+      threeScene.add(splatMesh)
 
       const applyCameraRotation = () => {
         if (!camera) {
@@ -105,28 +128,20 @@ export function SceneViewer({
       }
 
       resize()
-
       resizeObserver = new ResizeObserver(resize)
       resizeObserver.observe(container)
 
-      viewer = new Viewer({
-        rootElement: container,
-        renderer: webglRenderer,
-        camera: perspectiveCamera,
-        selfDrivenMode: false,
-        useBuiltInControls: false,
-        sharedMemoryForWorkers: false,
-        gpuAcceleratedSort: false,
-        cameraUp: [0, -1, 0],
-        initialCameraPosition: [3, 2, 8],
-        initialCameraLookAt: [0, 0, 0],
-        webXRMode: WebXRMode.VR,
-      })
+      xrButton = Spark.VRButton.createButton(webglRenderer)
+      if (xrButton) {
+        xrButton.classList.add("spark-vr-button")
+        container.appendChild(xrButton)
+      }
 
       handleKeyDown = (event: KeyboardEvent) => {
         if (event.repeat) {
           return
         }
+
         if (
           event.target instanceof HTMLElement &&
           (event.target.isContentEditable ||
@@ -219,50 +234,47 @@ export function SceneViewer({
         }
       }
 
-      try {
-        await viewer.addSplatScene(sceneAssetUrl, {
-          format: SceneFormat.Ply,
-          showLoadingUI: false,
-          splatAlphaRemovalThreshold: 5,
-        })
-
-        const renderFrame = (time: number) => {
-          const deltaSeconds =
-            previousTime === 0 ? 0 : Math.min((time - previousTime) / 1000, 0.05)
-          previousTime = time
-
-          moveCamera(deltaSeconds)
-          viewer?.update(webglRenderer, perspectiveCamera)
-          viewer?.render()
+      const renderFrame = (time: number) => {
+        if (!renderer || !camera || !scene) {
+          return
         }
 
-        webglRenderer.setAnimationLoop(renderFrame)
+        const deltaSeconds =
+          previousTime === 0 ? 0 : Math.min((time - previousTime) / 1000, 0.05)
+        previousTime = time
 
-        window.addEventListener("keydown", handleKeyDown)
-        window.addEventListener("keyup", handleKeyUp)
-        document.addEventListener("pointerlockchange", handlePointerLockChange)
-        window.addEventListener("mousemove", handleMouseMove)
-        container.addEventListener("click", handleClick)
+        moveCamera(deltaSeconds)
+        renderer.render(scene, camera)
+      }
 
-        if (mounted) {
-          setViewerState("ready")
-        }
-      } catch (error) {
-        if (mounted) {
-          setViewerState("error")
-          setViewerError(
-            error instanceof Error ? error.message : "Failed to load the scene asset."
-          )
-        }
+      window.addEventListener("keydown", handleKeyDown)
+      window.addEventListener("keyup", handleKeyUp)
+      document.addEventListener("pointerlockchange", handlePointerLockChange)
+      window.addEventListener("mousemove", handleMouseMove)
+      container.addEventListener("click", handleClick)
+      webglRenderer.setAnimationLoop(renderFrame)
+
+      if (mounted) {
+        setViewerState("ready")
       }
     }
 
-    void startViewer()
+    void startViewer().catch((error) => {
+      if (!mounted) {
+        return
+      }
+
+      setViewerState("error")
+      setViewerError(
+        error instanceof Error ? error.message : "Failed to load the scene asset."
+      )
+    })
 
     return () => {
       mounted = false
-      resizeObserver?.disconnect()
       pressedKeys.clear()
+      resizeObserver?.disconnect()
+
       if (handleKeyDown) {
         window.removeEventListener("keydown", handleKeyDown)
       }
@@ -282,10 +294,20 @@ export function SceneViewer({
         document.exitPointerLock()
       }
       renderer?.setAnimationLoop(null)
-      viewer?.stop()
-      void viewer?.dispose().catch(() => {
-        // The library is not robust about nested root elements; cleanup continues below.
-      })
+
+      if (scene && splatMesh) {
+        scene.remove(splatMesh)
+      }
+      splatMesh?.dispose()
+
+      if (scene && sparkRenderer) {
+        scene.remove(sparkRenderer)
+      }
+
+      if (xrButton && xrButton.parentElement === container) {
+        container.removeChild(xrButton)
+      }
+
       if (renderer && container) {
         renderer.dispose()
         if (renderer.domElement.parentElement === container) {
@@ -366,7 +388,7 @@ export function SceneViewer({
       <div className="relative min-h-[520px] bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.14),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(14,165,233,0.16),transparent_30%)]">
         <div
           ref={containerRef}
-          className="h-[520px] w-full cursor-crosshair"
+          className="spark-viewer h-[520px] w-full cursor-crosshair"
         />
 
         {viewerState === "loading" ? (
