@@ -81,7 +81,7 @@ export function SceneViewer({
         renderer: webglRenderer,
         sharedMemoryForWorkers: false,
         gpuAcceleratedSort: false,
-        cameraUp: [0, 1, 0],
+        cameraUp: [0, -1, 0],
         initialCameraPosition: [3, 2, 8],
         initialCameraLookAt: [0, 0, 0],
       })
