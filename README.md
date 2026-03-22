@@ -87,7 +87,7 @@ Sceneweaver/
 │   ├── dataset/
 │   │   ├── source_polyhaven.py      # Downloads CC0 equirectangular panoramas from Polyhaven
 │   │   ├── source_worldgen.py       # Generates panoramas from curated book prompts via WorldGen
-│   │   ├── build_dataset.py         # GPT-4o vision captioning pipeline for panoramas
+│   │   ├── build_dataset.py         # OpenAI o4-mini captioning pipeline for panoramas
 │   │   ├── extract_book_scenes.py   # Extracts scene descriptions from Project Gutenberg books
 │   │   └── prepare_pairs.py         # Merges sources into HuggingFace ImageFolder dataset
 │   ├── train/
@@ -157,17 +157,17 @@ Training pairs are always (equirectangular panorama, literary-style text). The d
 
 **Approach A — Panorama-first (primary):**
 
-Real panoramas are sourced first, then GPT-4o vision writes literary captions to match them.
+Real panoramas are sourced first, then OpenAI o4-mini writes literary captions to match them.
 
 - `source_polyhaven.py` — Downloads ~500+ CC0-licensed equirectangular HDR panoramas from Polyhaven, resized to 800x1600. These provide diverse, high-quality real-world environments.
 - `source_worldgen.py` — Generates panoramas from 30 curated book-themed prompts using WorldGen on a GPU machine, with 3 seeds per prompt (~90 panoramas). These teach the LoRA the WorldGen output distribution so it doesn't drift too far from the base model.
-- `build_dataset.py` — Feeds all panoramas through GPT-4o vision to generate literary-style captions for each image — how a novelist would describe the scene with metaphors, mood, and sensory detail.
+- `build_dataset.py` — Feeds all panoramas through OpenAI o4-mini to generate literary-style captions for each image — how a novelist would describe the scene with metaphors, mood, and sensory detail.
 
 **Approach B — Text-first (supplementary):**
 
 Literary passages are sourced first, then used to generate candidate panoramas for training.
 
-- `extract_book_scenes.py` — Downloads 25 public domain novels from Project Gutenberg, splits them into chunks, and uses GPT-4o to classify and extract scene-setting passages (not dialogue, not action — only physical environment descriptions). For each passage, GPT-4o also generates a visual scene description (spatial layout, lighting, objects, atmosphere). These visual descriptions are then fed to WorldGen to generate candidate panoramas, which are human-curated for quality. The final training pair is (generated panorama, original literary passage).
+- `extract_book_scenes.py` — Downloads 25 public domain novels from Project Gutenberg, splits them into chunks, and uses o4-mini to classify and extract scene-setting passages (not dialogue, not action — only physical environment descriptions). For each passage, o4-mini also generates a visual scene description (spatial layout, lighting, objects, atmosphere). These visual descriptions are then fed to WorldGen to generate candidate panoramas, which are human-curated for quality. The final training pair is (generated panorama, original literary passage).
 
 **Dataset assembly** (`prepare_pairs.py`) — Merges both approaches into a single HuggingFace-compatible ImageFolder dataset with `metadata.jsonl`. Handles train/val split, resizing to 800x1600, and wraps all captions with the WorldGen prompt format:
 
