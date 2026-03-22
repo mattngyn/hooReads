@@ -19,7 +19,7 @@ data/
 # Generated assets
 # static/scenes/
 static/audio/
-chapter1hobbit.pdf
+*.pdf
 
 # Finetuning artifacts (large files)
 finetune/dataset/panoramas/

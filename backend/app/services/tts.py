@@ -5,7 +5,7 @@ import httpx
 from app.config import get_settings
 
 CARTESIA_URL = "https://api.cartesia.ai/tts/bytes"
-VOICE_ID = "6ccbfb76-1fc6-48f7-b71d-91ac6298247b"
+VOICE_ID = "4f7f1324-1853-48a6-b294-4e78e8036a83"
 
 
 def _sanitize_text(text: str) -> str:
