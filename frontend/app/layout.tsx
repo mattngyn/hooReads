@@ -1,11 +1,14 @@
-import { Cinzel, Inter } from "next/font/google"
+import { EB_Garamond, Plus_Jakarta_Sans } from "next/font/google"
 
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"
 
-const inter = Inter({subsets:['latin'],variable:'--font-sans'})
-const cinzel = Cinzel({subsets:['latin'],variable:'--font-heading'})
+const jakarta = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-sans" })
+const ebGaramond = EB_Garamond({
+  subsets: ["latin"],
+  variable: "--font-heading",
+})
 
 export default function RootLayout({
   children,
@@ -16,7 +19,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn("antialiased text-[18px]", cinzel.variable, "font-sans", inter.variable)}
+      className={cn("antialiased", jakarta.variable, ebGaramond.variable, "font-sans")}
     >
       <body>
         <ThemeProvider>{children}</ThemeProvider>

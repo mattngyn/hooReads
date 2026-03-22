@@ -1,99 +1,244 @@
-import { Library, Plus } from "lucide-react"
+"use client"
 
-import { StoryGroup, type StoryMoment } from "@/components/home/generation-card"
-import { UploadPanel } from "@/components/home/upload-panel"
-import { Button } from "@/components/ui/button"
-import { getGeneration, listGenerations } from "@/lib/api/generations"
-import type { GenerationDetail } from "@/lib/api/types"
+import { useState, useRef, useCallback } from "react"
+import { useRouter } from "next/navigation"
+import { motion, AnimatePresence } from "framer-motion"
+import { Upload, ArrowRight } from "lucide-react"
+import { LoadingScreen } from "@/components/home/loading-screen"
+import { SceneryBackground } from "@/components/home/scenery-bg"
+import {
+  UploadIllustration,
+  GenerateIllustration,
+  ExploreIllustration,
+} from "@/components/home/step-illustrations"
 
-async function loadGenerationsWithMoments(): Promise<{
-  generations: GenerationDetail[]
-  error: string | null
-}> {
-  try {
-    const summaries = await listGenerations()
-    const generations = await Promise.all(
-      summaries.map((generation) => getGeneration(generation.id))
-    )
+const ease = [0.16, 1, 0.3, 1] as const
 
-    return { generations, error: null }
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to load generations from the backend."
+export default function HomePage() {
+  const router = useRouter()
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [isDragging, setIsDragging] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [fileName, setFileName] = useState<string | null>(null)
+  const [isTransitioning, setIsTransitioning] = useState(false)
 
-    return { generations: [], error: message }
-  }
-}
+  const handleFile = useCallback(
+    (file: File) => {
+      setFileName(file.name)
+      setIsLoading(true)
+      setTimeout(() => {
+        router.push("/dashboard")
+      }, 10000)
+    },
+    [router]
+  )
 
-// Helper to normalize inconsistent story titles from backend
-function normalizeStoryTitle(title: string | null): string {
-  const rawTitle = (title || "Untitled Story").trim()
-  
-  // Specific overrides based on user request
-  if (rawTitle.toLowerCase().includes("laundry room refuge")) {
-    return "Ready Player One"
-  }
-  if (rawTitle.toLowerCase().includes("mark on the green door")) {
-    return "The Hobbit"
-  }
-  
-  return rawTitle
-}
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault()
+      setIsDragging(false)
+      const file = e.dataTransfer.files[0]
+      if (file) handleFile(file)
+    },
+    [handleFile]
+  )
 
-export default async function Page() {
-  const { generations, error } = await loadGenerationsWithMoments()
-
-  // Group generations by title (Book)
-  const stories = generations.reduce<Record<string, { title: string; moments: StoryMoment[] }>>((acc, gen) => {
-    const title = normalizeStoryTitle(gen.title)
-    
-    if (!acc[title]) {
-      acc[title] = { title, moments: [] }
-    }
-    
-    // Add moments with generationId
-    const enrichedMoments = gen.moments.map(m => ({ ...m, generationId: gen.id }))
-    acc[title].moments.push(...enrichedMoments)
-    
-    return acc
-  }, {})
+  const handleFileInput = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0]
+      if (file) handleFile(file)
+    },
+    [handleFile]
+  )
 
   return (
-    <main className="min-h-svh bg-[linear-gradient(180deg,rgba(248,250,252,1),rgba(241,245,249,0.92))] px-4 py-6 dark:bg-[linear-gradient(180deg,rgba(2,6,23,1),rgba(15,23,42,0.96))] sm:px-6 lg:px-8">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
-        <header className="flex items-center justify-between rounded-[24px] border border-white/40 bg-white/65 px-8 pt-8 pb-6 shadow-[0_14px_50px_-40px_rgba(15,23,42,0.4)] backdrop-blur dark:border-white/10 dark:bg-white/5">
-          <div className="flex items-center gap-4">
-            <div className="flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800 shadow-xl dark:from-white dark:to-slate-200">
-               <span className="text-3xl text-white dark:text-slate-900">✨</span>
-            </div>
-            <div className="text-5xl font-bold tracking-[0.02em] text-slate-900 dark:text-white font-heading sm:text-6xl drop-shadow-sm">
-              Scene Weaver
+    <>
+      <AnimatePresence>
+        {isLoading && <LoadingScreen fileName={fileName} />}
+      </AnimatePresence>
+
+      {/* Dark sky transition when going to dashboard */}
+      <AnimatePresence>
+        {isTransitioning && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 1.2, ease: [0.4, 0, 0.2, 1] }}
+            className="fixed inset-0 z-[100]"
+            style={{ background: "linear-gradient(180deg, #0a0e1a 0%, #111827 40%, #1a2035 70%, #1e2840 100%)" }}
+          />
+        )}
+      </AnimatePresence>
+
+      <main className="sky-bg relative flex min-h-svh flex-col items-center overflow-hidden">
+        {/* Scenery silhouettes */}
+        <SceneryBackground />
+
+        {/* Hero section */}
+        <div className="relative z-10 flex w-full max-w-3xl flex-col items-center gap-6 px-5 pt-36 pb-20 text-center sm:px-8 sm:pt-44">
+          <motion.h1
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, ease }}
+            className="font-heading text-6xl tracking-[-1px] text-foreground sm:text-7xl lg:text-8xl"
+            style={{ lineHeight: 1.15 }}
+          >
+            Sceneweaver
+          </motion.h1>
+
+          <motion.p
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.12, ease }}
+            className="max-w-md text-base leading-relaxed text-muted-foreground sm:text-[17px]"
+          >
+            Transform any story into immersive 3D worlds.
+            <br />
+            Upload a PDF or TXT and watch scenes come alive.
+          </motion.p>
+
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.24, ease }}
+            className="flex items-center gap-3 pt-2"
+          >
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="inline-flex h-11 items-center gap-2 rounded-lg bg-blue px-6 text-[15px] font-semibold text-white shadow-sm transition-all hover:brightness-110 active:scale-[0.97]"
+            >
+              <Upload className="size-4" strokeWidth={2} />
+              Upload File
+            </button>
+
+            <button
+              onClick={() => {
+                setIsTransitioning(true)
+                setTimeout(() => router.push("/dashboard"), 1400)
+              }}
+              className="group inline-flex h-11 items-center gap-1.5 rounded-lg px-5 text-[15px] font-medium text-foreground/70 transition-colors hover:text-foreground"
+            >
+              Dashboard
+              <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" strokeWidth={2} />
+            </button>
+          </motion.div>
+        </div>
+
+        {/* Upload card */}
+        <motion.div
+          initial={{ opacity: 0, y: 32 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.3, ease }}
+          className="relative z-10 w-full max-w-2xl px-5 sm:px-8"
+        >
+          <div
+            className={`card-surface relative overflow-hidden rounded-3xl p-10 transition-all duration-200 sm:p-12 ${
+              isDragging ? "scale-[1.01] ring-2 ring-blue/30" : ""
+            }`}
+            onDragOver={(e) => {
+              e.preventDefault()
+              setIsDragging(true)
+            }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={handleDrop}
+          >
+            <div className="flex flex-col items-center gap-5">
+              <motion.div
+                animate={
+                  isDragging
+                    ? { scale: 1.08, y: -3 }
+                    : { scale: 1, y: 0 }
+                }
+                transition={{ duration: 0.2 }}
+                className="flex size-14 items-center justify-center rounded-2xl bg-white/50 dark:bg-white/8"
+              >
+                <Upload
+                  className="size-6 text-foreground/40"
+                  strokeWidth={1.5}
+                />
+              </motion.div>
+
+              <div className="flex flex-col items-center gap-1 text-center">
+                <h2 className="text-[15px] font-semibold tracking-[-0.2px] text-foreground/80">
+                  Drop your PDF or TXT here
+                </h2>
+                <p className="text-[13px] text-muted-foreground">
+                  or use the upload button above
+                </p>
+              </div>
             </div>
           </div>
-        </header>
+        </motion.div>
 
-        <UploadPanel />
+        {/* How it works */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.6, delay: 0.6 }}
+          className="relative z-10 w-full max-w-3xl px-5 py-24 sm:px-8"
+        >
+          <h2
+            className="font-heading text-center text-3xl tracking-[-0.5px] text-foreground sm:text-4xl"
+            style={{ lineHeight: 1.25 }}
+          >
+            3D worlds in 3 steps
+          </h2>
+          <p className="mt-3 text-center text-[15px] text-muted-foreground">
+            The easiest way to bring your stories to life.
+          </p>
 
-        <section className="space-y-8">
-          {error ? (
-            <div className="rounded-[28px] border border-rose-500/20 bg-rose-500/8 p-5 text-sm text-rose-700 dark:text-rose-300">
-              {error}
-            </div>
-          ) : null}
-
-          {!error && Object.keys(stories).length === 0 ? (
-            <div className="rounded-[28px] border border-dashed border-slate-900/12 bg-white/60 p-6 text-sm text-slate-600 dark:border-white/10 dark:bg-white/4 dark:text-slate-300">
-              No generations found in the backend yet.
-            </div>
-          ) : null}
-
-          <div className="space-y-12">
-            {Object.values(stories).map((story) => (
-              <StoryGroup key={story.title} title={story.title} moments={story.moments} />
+          <div className="mt-14 grid grid-cols-1 gap-6 sm:grid-cols-3">
+            {[
+              {
+                step: "1",
+                title: "Upload",
+                desc: "Drop a PDF or TXT file with any story or text.",
+                illustration: <UploadIllustration />,
+              },
+              {
+                step: "2",
+                title: "Generate",
+                desc: "AI finds the most vivid scenes and creates 3D worlds.",
+                illustration: <GenerateIllustration />,
+              },
+              {
+                step: "3",
+                title: "Explore",
+                desc: "Walk through your scenes in an immersive 3D viewer.",
+                illustration: <ExploreIllustration />,
+              },
+            ].map((item) => (
+              <div
+                key={item.step}
+                className="flex flex-col items-center text-center sm:items-start sm:text-left"
+              >
+                <div className="card-surface mb-5 flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-2xl p-4">
+                  {item.illustration}
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-sm font-medium text-muted-foreground">
+                    {item.step}
+                  </span>
+                  <h3 className="text-base font-semibold tracking-[-0.2px] text-foreground">
+                    {item.title}
+                  </h3>
+                </div>
+                <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
+                  {item.desc}
+                </p>
+              </div>
             ))}
           </div>
-        </section>
-      </div>
-    </main>
+        </motion.div>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".pdf,.txt"
+          onChange={handleFileInput}
+          className="hidden"
+        />
+      </main>
+    </>
   )
 }
