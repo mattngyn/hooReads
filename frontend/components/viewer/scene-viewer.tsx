@@ -162,8 +162,8 @@ export function SceneViewer({
         }
 
         const sensitivity = 0.0022
-        yaw -= event.movementX * sensitivity
-        pitch -= event.movementY * sensitivity
+        yaw += event.movementX * sensitivity
+        pitch += event.movementY * sensitivity
 
         const maxPitch = Math.PI / 2 - 0.05
         pitch = Math.max(-maxPitch, Math.min(maxPitch, pitch))
