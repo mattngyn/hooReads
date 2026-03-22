@@ -315,7 +315,3 @@ Generation Narration
 - **Dashboard** — Starry night sky with twinkling stars, subtle nebula washes, and a moon that parallaxes and fades on scroll. Scene cards display auto-generated thumbnails.
 - **Scene viewer** — Full 3D gaussian splat rendering with first-person controls, audio narration, and scene-to-scene navigation.
 - **Page transitions** — Smooth full-screen transitions between pages: sky darkens when entering the dashboard, brightens when returning home.
-
-## License
-
-MIT
